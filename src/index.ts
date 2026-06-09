@@ -4,6 +4,7 @@ import { parseArgs, HELP, VERSION, type ParsedArgs } from './cli.js';
 import { resolveTargets, type Scope } from './targets.js';
 import { formatDuration } from './duration.js';
 import * as hosts from './hosts.js';
+import * as firewall from './firewall.js';
 
 // Minimal ANSI styling that degrades to plain text when not a TTY.
 const tty = process.stdout.isTTY === true;
@@ -121,6 +122,22 @@ async function runBlock(parsed: ParsedArgs): Promise<number> {
 
   await hosts.flushDns();
   out(c.green(`  ✓ block active until ${until.toLocaleTimeString()}`));
+
+  let firewallActive = false;
+  if (parsed.firewall) {
+    try {
+      const result = await firewall.applyFirewall(targets);
+      firewallActive = true;
+      out(c.green(`  ✓ firewall: blocked ${result.blocked} IPs at the OS firewall`));
+      if (result.unresolved.length > 0) {
+        out(c.dim(`    (${result.unresolved.length} hostnames did not resolve and were skipped)`));
+      }
+    } catch (e) {
+      err(c.yellow(`  ⚠ firewall rules could not be applied: ${(e as Error).message}`));
+      err(c.yellow('    Continuing with the hosts-file block only.'));
+    }
+  }
+
   if (hosts.isWsl()) {
     out();
     out(c.yellow('  ⚠ WSL detected: this only blocks processes running inside WSL.'));
@@ -146,6 +163,11 @@ async function runBlock(parsed: ParsedArgs): Promise<number> {
     restored = true;
     if (timer) clearTimeout(timer);
     if (ticker) clearInterval(ticker);
+    if (firewallActive) {
+      // Fire and forget: rules are tagged, so a missed removal here is still
+      // recoverable via "killm --restore".
+      void firewall.removeFirewall().catch(() => {});
+    }
     try {
       const removed = hosts.removeBlock();
       void hosts.flushDns(); // fire and forget on the way out
@@ -247,6 +269,13 @@ export async function main(argv: string[]): Promise<number> {
       try {
         const removed = hosts.removeBlock();
         await hosts.flushDns();
+        // Always sweep firewall rules too: they are tagged "killm", so this
+        // also cleans up after a crashed --firewall run. Harmless when none
+        // exist or the platform is unsupported. Skipped under the test
+        // override so tests never touch the real firewall.
+        if (!process.env.KILLM_HOSTS_PATH) {
+          await firewall.removeFirewall().catch(() => {});
+        }
         out(
           removed
             ? c.green('killm: block lifted. Access restored.')

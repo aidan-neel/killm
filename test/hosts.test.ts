@@ -112,3 +112,32 @@ test('applyBlock works when the hosts file does not exist', () => {
 test('hasPrivileges is true under the test override', () => {
   assert.strictEqual(hosts.hasPrivileges(), true);
 });
+
+// ---- WSL detection -------------------------------------------------------
+
+test('isWsl: detects a Microsoft kernel string (Linux only)', (t) => {
+  if (process.platform !== 'linux') {
+    t.skip('isWsl is always false off Linux');
+    return;
+  }
+  const procVersion = path.join(tmpDir, 'proc-version');
+  fs.writeFileSync(
+    procVersion,
+    'Linux version 5.15.167.4-microsoft-standard-WSL2 (root@build) #1 SMP\n'
+  );
+  assert.strictEqual(hosts.isWsl(procVersion), true);
+});
+
+test('isWsl: false on a regular kernel', (t) => {
+  if (process.platform !== 'linux') {
+    t.skip('isWsl is always false off Linux');
+    return;
+  }
+  const procVersion = path.join(tmpDir, 'proc-version');
+  fs.writeFileSync(procVersion, 'Linux version 6.8.0-45-generic (buildd@host) #45-Ubuntu SMP\n');
+  assert.strictEqual(hosts.isWsl(procVersion), false);
+});
+
+test('isWsl: false when the file is unreadable', () => {
+  assert.strictEqual(hosts.isWsl(path.join(tmpDir, 'does-not-exist')), false);
+});

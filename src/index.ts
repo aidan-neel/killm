@@ -121,6 +121,19 @@ async function runBlock(parsed: ParsedArgs): Promise<number> {
 
   await hosts.flushDns();
   out(c.green(`  ✓ block active until ${until.toLocaleTimeString()}`));
+  if (hosts.isWsl()) {
+    out();
+    out(c.yellow('  ⚠ WSL detected: this only blocks processes running inside WSL.'));
+    out(c.yellow('    Windows apps (your browser!) read the Windows hosts file and are'));
+    out(c.yellow('    NOT affected. To block them, run killm from an Administrator'));
+    out(c.yellow('    PowerShell/terminal on Windows:  npx killm for 1h --web'));
+  }
+  out();
+  out(
+    c.dim('  note: browsers cache DNS and "Secure DNS" (DoH) bypasses the hosts') +
+      '\n' +
+      c.dim('  file entirely — restart the browser / disable Secure DNS if needed.')
+  );
   out();
 
   let timer: NodeJS.Timeout | null = null;

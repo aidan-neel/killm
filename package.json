@@ -1,0 +1,49 @@
+{
+  "name": "killm",
+  "version": "1.0.0",
+  "description": "Temporarily block your machine from reaching LLM services to curb AI dependency. npx killm for 1h --agents",
+  "bin": {
+    "killm": "bin/killm.js"
+  },
+  "type": "commonjs",
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "focus",
+    "block",
+    "hosts",
+    "productivity",
+    "digital-wellbeing",
+    "claude",
+    "chatgpt",
+    "copilot",
+    "cursor"
+  ],
+  "author": "Aidan Neel",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aidan-neel/killm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aidan-neel/killm/issues"
+  },
+  "homepage": "https://github.com/aidan-neel/killm#readme",
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ]
+}

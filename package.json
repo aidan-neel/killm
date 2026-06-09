@@ -1,0 +1,64 @@
+{
+  "name": "killm",
+  "version": "1.0.0",
+  "description": "Temporarily block your machine from reaching LLM services to curb AI dependency. npx killm for 1h --agents",
+  "bin": {
+    "killm": "dist/src/bin.js"
+  },
+  "type": "module",
+  "files": [
+    "dist/src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
+    "test": "node --test dist/test/duration.test.js dist/test/targets.test.js dist/test/cli.test.js dist/test/hosts.test.js dist/test/e2e.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "npm run lint && npm run format:check && npm test"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "focus",
+    "block",
+    "hosts",
+    "productivity",
+    "digital-wellbeing",
+    "claude",
+    "chatgpt",
+    "copilot",
+    "cursor"
+  ],
+  "author": "Aidan Neel",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aidan-neel/killm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aidan-neel/killm/issues"
+  },
+  "homepage": "https://github.com/aidan-neel/killm#readme",
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.2",
+    "eslint": "^10.4.1",
+    "prettier": "^3.8.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.0"
+  }
+}

@@ -163,12 +163,26 @@ target hostname at `0.0.0.0` (and `::1` for IPv6):
 ```
 
 It then flushes the OS DNS cache so the change takes effect immediately. When
-the timer expires, or on `Ctrl+C`, `SIGTERM`, or process exit, it strips that
-block back out and flushes again. The markers mean it only ever touches its own
-lines — your existing hosts entries are left alone.
+the timer expires — or on `Ctrl+C`, `SIGTERM`, or closing the terminal
+(`SIGHUP`) — it strips that block back out and flushes again. The markers mean
+it only ever touches its own lines — your existing hosts entries are left
+alone.
 
-If something goes wrong and a block is left behind, `sudo npx killm --restore`
-(or the Administrator equivalent) cleans it up.
+### If the killm process dies, the block stays — until killm heals it
+
+The timer lives in the killm process, so **keep it running** for the duration.
+Ctrl+C and closing the terminal both lift the block cleanly, but a `kill -9`,
+a crash, or a machine shutdown can strand the block in your hosts file.
+
+killm writes the expiry time into the block itself, so it self-heals: **any
+later killm command** (`--status`, `--restore`, or starting a new block)
+notices an expired stranded block and removes it. To lift one immediately:
+
+```bash
+sudo npx killm --restore
+```
+
+`killm --status` also tells you when an active block is scheduled to lift.
 
 ## Firewall mode (`--firewall`)
 

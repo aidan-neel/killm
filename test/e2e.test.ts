@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { buildBlock } from '../src/hosts.js';
@@ -121,4 +121,79 @@ test('--restore is a friendly no-op when nothing is blocked', async () => {
   const r = await run(['--restore']);
   assert.strictEqual(r.code, 0);
   assert.match(r.stdout, /no block was active/);
+});
+
+test('--status auto-cleans an EXPIRED stranded block', async () => {
+  // Simulate a hard kill: block with an expiry that has already passed.
+  fs.writeFileSync(
+    tmpHosts,
+    BASE + '\n' + buildBlock(['claude.ai'], { until: new Date(Date.now() - 60_000) }) + '\n'
+  );
+
+  const r = await run(['--status']);
+  assert.strictEqual(r.code, 0);
+  assert.match(r.stdout, /no block active/);
+  assert.match(r.stdout, /cleaned up an expired block/);
+  assert.ok(!fs.readFileSync(tmpHosts, 'utf8').includes('claude.ai'));
+});
+
+test('--status reports the scheduled lift time of an active block', async () => {
+  fs.writeFileSync(
+    tmpHosts,
+    BASE + '\n' + buildBlock(['claude.ai'], { until: new Date(Date.now() + 3_600_000) }) + '\n'
+  );
+
+  const r = await run(['--status']);
+  assert.strictEqual(r.code, 0);
+  assert.match(r.stdout, /ACTIVE/);
+  assert.match(r.stdout, /Scheduled to lift at/);
+  assert.ok(fs.readFileSync(tmpHosts, 'utf8').includes('claude.ai'), 'active block kept');
+});
+
+test('starting a new block heals an expired stranded one first', async () => {
+  fs.writeFileSync(
+    tmpHosts,
+    BASE + '\n' + buildBlock(['poe.com'], { until: new Date(Date.now() - 60_000) }) + '\n'
+  );
+
+  const r = await run(['1s', '--web', '--yes']);
+  assert.strictEqual(r.code, 0);
+  assert.match(r.stdout, /cleaned up an expired block/);
+  assert.match(r.stdout, /block lifted \(time elapsed\)/);
+  assert.ok(!fs.readFileSync(tmpHosts, 'utf8').includes('poe.com'));
+});
+
+test('SIGHUP (terminal closed) lifts the block', { skip: process.platform === 'win32' }, () => {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(process.execPath, [BIN, '60s', '--web', '--yes'], {
+      env: { ...process.env, KILLM_HOSTS_PATH: tmpHosts },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let sent = false;
+    child.stdout.on('data', (chunk: Buffer) => {
+      if (!sent && chunk.toString().includes('block active')) {
+        sent = true;
+        // Give the run loop a beat to install its signal handlers.
+        setTimeout(() => child.kill('SIGHUP'), 300);
+      }
+    });
+
+    const timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error('child did not exit after SIGHUP'));
+    }, 15_000);
+
+    child.on('exit', () => {
+      clearTimeout(timeout);
+      try {
+        const after = fs.readFileSync(tmpHosts, 'utf8');
+        assert.ok(!after.includes('claude.ai'), 'block must be removed on SIGHUP');
+        assert.ok(after.includes('localhost'), 'original entries preserved');
+        resolve();
+      } catch (e) {
+        reject(e as Error);
+      }
+    });
+  });
 });

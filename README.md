@@ -39,6 +39,36 @@ Editing the hosts file needs elevated privileges:
 - **macOS / Linux:** prefix with `sudo` → `sudo npx killm for 1h --agents`
 - **Windows:** run from an **Administrator** terminal
 
+### WSL users — read this
+
+WSL and Windows have **separate hosts files**. Running `sudo npx killm` inside
+WSL edits WSL's `/etc/hosts`, which only blocks processes running _inside_ WSL
+(curl, node, coding agents in your WSL shell). Your browser is a Windows app —
+it reads `C:\Windows\System32\drivers\etc\hosts` and is **not affected**.
+
+To block Windows apps (the browser, Windows-side editors), run killm **on
+Windows** from an Administrator PowerShell:
+
+```powershell
+npx killm for 1h --web
+```
+
+killm detects WSL and prints a warning when this applies. If you want both
+sides blocked, run it in both places.
+
+### Browser caveats
+
+Two browser behaviors can make a block look like it isn't working:
+
+- **Secure DNS (DNS-over-HTTPS):** when enabled, the browser resolves names
+  through an encrypted remote resolver and **bypasses the hosts file
+  entirely**. Disable it (Chrome/Edge: Settings → Privacy → Security → "Use
+  secure DNS"; Firefox: Settings → Privacy → DNS over HTTPS) for the block to
+  apply.
+- **Browser DNS caching:** already-open tabs and cached lookups keep working
+  for a while. Restart the browser, or clear its DNS cache
+  (`chrome://net-internals/#dns` in Chrome/Edge).
+
 ## The key idea: agents vs. web
 
 The whole point of `killm` is that an agentic coding tool and a chat website

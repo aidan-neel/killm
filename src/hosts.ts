@@ -170,3 +170,17 @@ export function hasPrivileges(): boolean {
   if (process.platform === 'win32') return true;
   return typeof process.getuid === 'function' && process.getuid() === 0;
 }
+
+/**
+ * Whether we are running inside Windows Subsystem for Linux. A block applied
+ * here edits WSL's /etc/hosts only — Windows browsers read the Windows hosts
+ * file and are NOT affected.
+ */
+export function isWsl(procVersionPath = '/proc/version'): boolean {
+  if (process.platform !== 'linux') return false;
+  try {
+    return /microsoft/i.test(fs.readFileSync(procVersionPath, 'utf8'));
+  } catch {
+    return false;
+  }
+}

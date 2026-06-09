@@ -15,7 +15,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
-    "test": "node --test dist/test/duration.test.js dist/test/targets.test.js dist/test/cli.test.js dist/test/hosts.test.js dist/test/e2e.test.js",
+    "test": "node --test dist/test/duration.test.js dist/test/targets.test.js dist/test/cli.test.js dist/test/hosts.test.js dist/test/firewall.test.js dist/test/e2e.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

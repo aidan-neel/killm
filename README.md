@@ -125,6 +125,7 @@ You can combine `--agents` and `--web`; that's the same as `--all`.
 
 | Option            | Effect                                           |
 | ----------------- | ------------------------------------------------ |
+| `--firewall`      | Also block current IPs at the OS firewall        |
 | `--restore`       | Lift any active block right now and exit         |
 | `--status`        | Report whether a block is currently active       |
 | `--list`          | Print the hostnames a given scope would block    |
@@ -168,6 +169,35 @@ lines — your existing hosts entries are left alone.
 
 If something goes wrong and a block is left behind, `sudo npx killm --restore`
 (or the Administrator equivalent) cleans it up.
+
+## Firewall mode (`--firewall`)
+
+The hosts file only intercepts name resolution, so a browser with **Secure DNS
+(DoH)** enabled bypasses it. `--firewall` closes that hole: in addition to the
+hosts entries, killm resolves each target hostname to its **current IPs** and
+blocks those at the OS firewall:
+
+```bash
+sudo npx killm for 1h --web --firewall
+```
+
+- **Linux:** `iptables` / `ip6tables` OUTPUT rules, tagged with a `killm`
+  comment
+- **Windows:** one outbound Windows Firewall rule named `killm` (via `netsh`)
+- **macOS:** a `pf` anchor named `killm`
+
+Rules are removed together with the hosts block (timer, `Ctrl+C`, or
+`killm --restore` — which also sweeps up rules left behind by a crash, since
+they're all tagged).
+
+Caveats, honestly stated:
+
+- IPs are captured **at block time**; if a provider rotates addresses
+  mid-block, new IPs aren't covered.
+- Big providers sit behind shared CDNs — blocking their current IPs _may_
+  affect unrelated sites served from the same edge.
+- Inside WSL, iptables rules (like the hosts file) only affect WSL traffic,
+  not Windows apps.
 
 ## Limitations & honesty
 

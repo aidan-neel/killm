@@ -41,6 +41,13 @@ test('--dry-run and --yes are captured', () => {
   assert.strictEqual(p.yes, true);
 });
 
+test('--firewall is captured and defaults to off', () => {
+  assert.strictEqual(parseArgs(['1h']).firewall, false);
+  const p = parseArgs(['1h', '--web', '--firewall']);
+  assert.strictEqual(p.command, 'run');
+  assert.strictEqual(p.firewall, true);
+});
+
 test('missing duration is an error', () => {
   const p = parseArgs(['--agents']);
   assert.strictEqual(p.command, 'help');

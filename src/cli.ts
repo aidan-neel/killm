@@ -10,6 +10,7 @@ export interface ParsedArgs {
   scope: Scope;
   dryRun: boolean;
   yes: boolean;
+  firewall: boolean;
   durationInput?: string;
   durationMs?: number;
   error?: string;
@@ -41,6 +42,9 @@ SCOPE  (pick one or more; default is --all)
   --all      Block both of the above. This is the default if no scope is given.
 
 OPTIONS
+  --firewall       Also block the targets' current IPs at the OS firewall
+                   (iptables/ip6tables, Windows Firewall, or pf). Catches
+                   browsers that bypass the hosts file via Secure DNS (DoH).
   --restore        Remove any active killm block right now and exit.
   --status         Show whether a block is currently active and exit.
   --list           Print the hostnames that would be blocked and exit.
@@ -69,6 +73,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     scope: { agents: false, web: false, all: false },
     dryRun: false,
     yes: false,
+    firewall: false,
   };
 
   let explicit: 'status' | 'list' | 'restore' | undefined;
@@ -94,6 +99,9 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         break;
       case '--dry-run':
         result.dryRun = true;
+        break;
+      case '--firewall':
+        result.firewall = true;
         break;
       case '-y':
       case '--yes':

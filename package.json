@@ -1,6 +1,6 @@
 {
   "name": "killm",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Temporarily block your machine from reaching LLM services to curb AI dependency. npx killm for 1h --agents",
   "bin": {
     "killm": "dist/src/bin.js"

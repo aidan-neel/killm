@@ -44,12 +44,12 @@ Editing the hosts file needs elevated privileges:
 The whole point of `killm` is that an agentic coding tool and a chat website
 talk to **different hostnames**, so you can cut one without losing the other:
 
-| Tool | Hostname | Scope |
-| --- | --- | --- |
+| Tool                        | Hostname            | Scope      |
+| --------------------------- | ------------------- | ---------- |
 | Claude Code, Aider, raw API | `api.anthropic.com` | `--agents` |
-| Claude chat website | `claude.ai` | `--web` |
-| OpenAI API, Codex | `api.openai.com` | `--agents` |
-| ChatGPT website | `chatgpt.com` | `--web` |
+| Claude chat website         | `claude.ai`         | `--web`    |
+| OpenAI API, Codex           | `api.openai.com`    | `--agents` |
+| ChatGPT website             | `chatgpt.com`       | `--web`    |
 
 So:
 
@@ -83,25 +83,25 @@ A bare number is treated as minutes (`45` = `45m`).
 
 ### Scope
 
-| Flag | Blocks |
-| --- | --- |
+| Flag       | Blocks                                   |
+| ---------- | ---------------------------------------- |
 | `--agents` | Agentic coding tools + raw API endpoints |
-| `--web` | Consumer chat websites |
-| `--all` | Both (default) |
+| `--web`    | Consumer chat websites                   |
+| `--all`    | Both (default)                           |
 
 You can combine `--agents` and `--web`; that's the same as `--all`.
 
 ### Options
 
-| Option | Effect |
-| --- | --- |
-| `--restore` | Lift any active block right now and exit |
-| `--status` | Report whether a block is currently active |
-| `--list` | Print the hostnames a given scope would block |
-| `--dry-run` | Show what would change without touching anything |
-| `-y`, `--yes` | Skip the confirmation prompt |
-| `-h`, `--help` | Show help |
-| `-v`, `--version` | Show version |
+| Option            | Effect                                           |
+| ----------------- | ------------------------------------------------ |
+| `--restore`       | Lift any active block right now and exit         |
+| `--status`        | Report whether a block is currently active       |
+| `--list`          | Print the hostnames a given scope would block    |
+| `--dry-run`       | Show what would change without touching anything |
+| `-y`, `--yes`     | Skip the confirmation prompt                     |
+| `-h`, `--help`    | Show help                                        |
+| `-v`, `--version` | Show version                                     |
 
 ### Examples
 
@@ -150,6 +150,24 @@ determined workaround:
   hard, not to make it impossible.
 - Hostname lists drift as providers add endpoints. `--list` shows the current
   set; PRs to keep it current are welcome.
+
+## Development
+
+The CLI is written in TypeScript (ESM) with zero runtime dependencies; tests
+run against the compiled output, so they exercise exactly what ships.
+
+```bash
+npm ci               # install dev toolchain
+npm run build        # compile TypeScript to dist/
+npm test             # build + run the test suite (node:test)
+npm run lint         # eslint
+npm run format       # prettier --write
+npm run typecheck    # tsc --noEmit
+```
+
+CI runs lint, format, typecheck, and the test matrix (Linux/macOS/Windows ×
+Node 18/20/22) on every push and PR. Publishing happens automatically when a
+GitHub release is published (requires the `NPM_TOKEN` repo secret).
 
 ## License
 

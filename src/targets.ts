@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Domain target lists, split by the kind of access they represent.
  *
@@ -15,9 +13,15 @@
  * we block the closest dedicated hostname instead.
  */
 
+export interface Scope {
+  agents: boolean;
+  web: boolean;
+  all: boolean;
+}
+
 // API endpoints + dedicated coding-assistant backends. Blocking these stops
 // agentic coding tools and raw API usage WITHOUT touching the chat websites.
-const AGENTS = [
+export const AGENTS: readonly string[] = [
   // Provider API endpoints (used by Claude Code, Codex, Aider, Continue, etc.)
   'api.anthropic.com',
   'api.openai.com',
@@ -72,7 +76,7 @@ const AGENTS = [
 
 // Consumer chat websites. Blocking these stops the browser apps WITHOUT
 // touching the API endpoints that coding agents rely on.
-const WEB = [
+export const WEB: readonly string[] = [
   // OpenAI ChatGPT
   'chatgpt.com',
   'chat.openai.com',
@@ -123,12 +127,9 @@ const WEB = [
 /**
  * Resolve the set of hostnames to block from the parsed category flags.
  * Returns a de-duplicated, sorted array.
- *
- * @param {{agents?: boolean, web?: boolean, all?: boolean}} flags
- * @returns {string[]}
  */
-function resolveTargets(flags) {
-  const set = new Set();
+export function resolveTargets(flags: Partial<Scope>): string[] {
+  const set = new Set<string>();
 
   if (flags.all || flags.agents) {
     for (const h of AGENTS) set.add(h);
@@ -139,5 +140,3 @@ function resolveTargets(flags) {
 
   return Array.from(set).sort();
 }
-
-module.exports = { AGENTS, WEB, resolveTargets };

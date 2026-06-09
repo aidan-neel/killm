@@ -1,20 +1,28 @@
-'use strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFile } from 'node:child_process';
 
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { execFile } = require('child_process');
-
-const BEGIN = '# >>> killm block (do not edit between markers) >>>';
-const END = '# <<< killm block <<<';
+export const BEGIN = '# >>> killm block (do not edit between markers) >>>';
+export const END = '# <<< killm block <<<';
 const SINK4 = '0.0.0.0';
 const SINK6 = '::1';
 
+export interface BlockOptions {
+  /** When the block is scheduled to be lifted (recorded as a comment). */
+  until?: Date;
+}
+
+function errnoCode(err: unknown): string | undefined {
+  return (err as NodeJS.ErrnoException)?.code;
+}
+
 /**
  * Absolute path to the OS hosts file.
- * @returns {string}
+ * KILLM_HOSTS_PATH overrides it (used by the test suite).
  */
-function hostsPath() {
+export function hostsPath(): string {
+  if (process.env.KILLM_HOSTS_PATH) return process.env.KILLM_HOSTS_PATH;
   if (process.platform === 'win32') {
     const root = process.env.SystemRoot || 'C:\\Windows';
     return path.join(root, 'System32', 'drivers', 'etc', 'hosts');
@@ -24,23 +32,20 @@ function hostsPath() {
 
 /**
  * Read the current hosts file as text. Returns '' if it does not exist.
- * @returns {string}
  */
-function readHosts() {
+export function readHosts(): string {
   try {
     return fs.readFileSync(hostsPath(), 'utf8');
   } catch (err) {
-    if (err.code === 'ENOENT') return '';
+    if (errnoCode(err) === 'ENOENT') return '';
     throw err;
   }
 }
 
 /**
  * Strip any existing killm-managed block from hosts text.
- * @param {string} text
- * @returns {string}
  */
-function stripBlock(text) {
+export function stripBlock(text: string): string {
   const begin = text.indexOf(BEGIN);
   if (begin === -1) return text;
   const end = text.indexOf(END, begin);
@@ -55,11 +60,8 @@ function stripBlock(text) {
 
 /**
  * Build the killm block text for the given hostnames.
- * @param {string[]} hosts
- * @param {{until?: Date}} [opts]
- * @returns {string}
  */
-function buildBlock(hosts, opts = {}) {
+export function buildBlock(hosts: readonly string[], opts: BlockOptions = {}): string {
   const lines = [BEGIN];
   lines.push(`# added by killm at ${new Date().toISOString()}`);
   if (opts.until) {
@@ -77,9 +79,8 @@ function buildBlock(hosts, opts = {}) {
 /**
  * Atomically write hosts text by writing to a temp file then renaming.
  * Falls back to a direct write if rename across devices fails.
- * @param {string} text
  */
-function writeHosts(text) {
+function writeHosts(text: string): void {
   const target = hostsPath();
   const normalized = text.endsWith('\n') ? text : text + '\n';
   const tmp = path.join(os.tmpdir(), `killm-hosts-${process.pid}-${Date.now()}.tmp`);
@@ -87,12 +88,16 @@ function writeHosts(text) {
   try {
     fs.renameSync(tmp, target);
   } catch (err) {
-    if (err.code === 'EXDEV') {
+    if (errnoCode(err) === 'EXDEV') {
       // Temp dir is on a different filesystem; write in place instead.
       fs.writeFileSync(target, normalized, { mode: 0o644 });
       fs.unlinkSync(tmp);
     } else {
-      try { fs.unlinkSync(tmp); } catch (_) { /* ignore */ }
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        /* ignore */
+      }
       throw err;
     }
   }
@@ -101,10 +106,8 @@ function writeHosts(text) {
 /**
  * Apply a block for the given hostnames. Removes any prior killm block first
  * so repeated runs stay idempotent.
- * @param {string[]} hosts
- * @param {{until?: Date}} [opts]
  */
-function applyBlock(hosts, opts = {}) {
+export function applyBlock(hosts: readonly string[], opts: BlockOptions = {}): void {
   const current = stripBlock(readHosts());
   const base = current.replace(/\n+$/, '');
   const next = (base ? base + '\n\n' : '') + buildBlock(hosts, opts) + '\n';
@@ -113,9 +116,10 @@ function applyBlock(hosts, opts = {}) {
 
 /**
  * Remove the killm block from the hosts file. No-op if absent.
- * @returns {boolean} whether a block was present and removed
+ *
+ * @returns whether a block was present and removed
  */
-function removeBlock() {
+export function removeBlock(): boolean {
   const current = readHosts();
   if (!current.includes(BEGIN)) return false;
   writeHosts(stripBlock(current));
@@ -124,19 +128,20 @@ function removeBlock() {
 
 /**
  * Whether a killm block is currently present.
- * @returns {boolean}
  */
-function isBlocked() {
+export function isBlocked(): boolean {
   return readHosts().includes(BEGIN);
 }
 
 /**
  * Best-effort DNS cache flush so the new hosts entries take effect immediately.
  * Silently ignores failures — the block still works, it may just take a moment.
- * @returns {Promise<void>}
  */
-function flushDns() {
-  const run = (cmd, args) =>
+export function flushDns(): Promise<void> {
+  // Pointless (and slow) when operating on a fake hosts file in tests.
+  if (process.env.KILLM_HOSTS_PATH) return Promise.resolve();
+
+  const run = (cmd: string, args: string[]): Promise<void> =>
     new Promise((resolve) => {
       execFile(cmd, args, () => resolve());
     });
@@ -159,23 +164,9 @@ function flushDns() {
  * True when the process likely has the privileges needed to edit the hosts
  * file (root on POSIX). On Windows we can't cheaply tell, so assume yes and
  * let the write surface EPERM/EACCES if not.
- * @returns {boolean}
  */
-function hasPrivileges() {
+export function hasPrivileges(): boolean {
+  if (process.env.KILLM_HOSTS_PATH) return true; // test override, no root needed
   if (process.platform === 'win32') return true;
   return typeof process.getuid === 'function' && process.getuid() === 0;
 }
-
-module.exports = {
-  hostsPath,
-  readHosts,
-  applyBlock,
-  removeBlock,
-  isBlocked,
-  flushDns,
-  hasPrivileges,
-  stripBlock,
-  buildBlock,
-  BEGIN,
-  END,
-};

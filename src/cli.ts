@@ -1,10 +1,25 @@
-'use strict';
+import fs from 'node:fs';
 
-const { parseDuration } = require('./duration');
+import { parseDuration } from './duration.js';
+import type { Scope } from './targets.js';
 
-const VERSION = require('../package.json').version;
+export type Command = 'help' | 'version' | 'status' | 'list' | 'restore' | 'run';
 
-const HELP = `killm — temporarily block your machine from reaching LLM services
+export interface ParsedArgs {
+  command: Command;
+  scope: Scope;
+  dryRun: boolean;
+  yes: boolean;
+  durationInput?: string;
+  durationMs?: number;
+  error?: string;
+}
+
+export const VERSION: string = JSON.parse(
+  fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+).version;
+
+export const HELP = `killm — temporarily block your machine from reaching LLM services
 
 USAGE
   npx killm for <duration> [scope] [options]
@@ -47,30 +62,19 @@ NOTE
 
 /**
  * Parse argv (without node/script) into a structured command.
- *
- * @param {string[]} argv
- * @returns {{
- *   command: 'help'|'version'|'status'|'list'|'restore'|'run',
- *   durationMs?: number,
- *   durationInput?: string,
- *   scope: {agents:boolean, web:boolean, all:boolean},
- *   dryRun: boolean,
- *   yes: boolean,
- *   error?: string
- * }}
  */
-function parseArgs(argv) {
-  const result = {
+export function parseArgs(argv: readonly string[]): ParsedArgs {
+  const result: ParsedArgs = {
     command: 'run',
     scope: { agents: false, web: false, all: false },
     dryRun: false,
     yes: false,
   };
 
-  let durationInput;
+  let explicit: 'status' | 'list' | 'restore' | undefined;
+  let durationInput: string | undefined;
 
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
+  for (const arg of argv) {
     switch (arg) {
       case '-h':
       case '--help':
@@ -79,15 +83,14 @@ function parseArgs(argv) {
       case '--version':
         return { ...result, command: 'version' };
       case '--status':
-        result.command = result.command === 'run' ? 'status' : result.command;
-        result._explicit = 'status';
+        explicit = 'status';
         break;
       case '--list':
-        result._explicit = 'list';
+        explicit = 'list';
         break;
       case '--restore':
       case '--unblock':
-        result._explicit = 'restore';
+        explicit = 'restore';
         break;
       case '--dry-run':
         result.dryRun = true;
@@ -121,11 +124,11 @@ function parseArgs(argv) {
   }
 
   // Terminal sub-commands that don't need a duration.
-  if (result._explicit === 'restore') return { ...result, command: 'restore' };
-  if (result._explicit === 'status') return { ...result, command: 'status' };
+  if (explicit === 'restore') return { ...result, command: 'restore' };
+  if (explicit === 'status') return { ...result, command: 'status' };
 
   // --list needs to know the scope but not a duration.
-  if (result._explicit === 'list') {
+  if (explicit === 'list') {
     if (!result.scope.agents && !result.scope.web && !result.scope.all) {
       result.scope.all = true;
     }
@@ -134,14 +137,18 @@ function parseArgs(argv) {
 
   // From here we're running a block, which requires a duration.
   if (durationInput === undefined) {
-    return { ...result, command: 'help', error: 'a duration is required, e.g. "killm for 1h --agents"' };
+    return {
+      ...result,
+      command: 'help',
+      error: 'a duration is required, e.g. "killm for 1h --agents"',
+    };
   }
 
-  let durationMs;
+  let durationMs: number;
   try {
     durationMs = parseDuration(durationInput);
   } catch (err) {
-    return { ...result, command: 'help', error: err.message };
+    return { ...result, command: 'help', error: (err as Error).message };
   }
 
   // Default scope: everything.
@@ -149,12 +156,5 @@ function parseArgs(argv) {
     result.scope.all = true;
   }
 
-  return {
-    ...result,
-    command: 'run',
-    durationInput,
-    durationMs,
-  };
+  return { ...result, command: 'run', durationInput, durationMs };
 }
-
-module.exports = { parseArgs, HELP, VERSION };

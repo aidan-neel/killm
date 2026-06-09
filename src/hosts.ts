@@ -5,6 +5,8 @@ import { execFile } from 'node:child_process';
 
 export const BEGIN = '# >>> killm block (do not edit between markers) >>>';
 export const END = '# <<< killm block <<<';
+/** Machine-parseable expiry marker inside the block. */
+export const EXPIRES_PREFIX = '# killm-expires: ';
 const SINK4 = '0.0.0.0';
 const SINK6 = '::1';
 
@@ -66,6 +68,7 @@ export function buildBlock(hosts: readonly string[], opts: BlockOptions = {}): s
   lines.push(`# added by killm at ${new Date().toISOString()}`);
   if (opts.until) {
     lines.push(`# auto-removed at ${opts.until.toISOString()} (or when killm exits)`);
+    lines.push(`${EXPIRES_PREFIX}${opts.until.toISOString()}`);
   }
   for (const h of hosts) {
     lines.push(`${SINK4}\t${h}`);
@@ -131,6 +134,35 @@ export function removeBlock(): boolean {
  */
 export function isBlocked(): boolean {
   return readHosts().includes(BEGIN);
+}
+
+/**
+ * When the current block is scheduled to expire, or null when no block is
+ * present or it carries no (valid) expiry marker — e.g. blocks written by
+ * killm <= 1.0.2.
+ */
+export function blockExpiry(text: string = readHosts()): Date | null {
+  const begin = text.indexOf(BEGIN);
+  if (begin === -1) return null;
+  const idx = text.indexOf(EXPIRES_PREFIX, begin);
+  if (idx === -1) return null;
+  const start = idx + EXPIRES_PREFIX.length;
+  const lineEnd = text.indexOf('\n', start);
+  const stamp = text.slice(start, lineEnd === -1 ? undefined : lineEnd).trim();
+  const date = new Date(stamp);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Remove the block if its expiry has passed — heals hosts files stranded by
+ * a killed process (terminal closed, kill -9, crash, machine shutdown).
+ *
+ * @returns true when an expired block was found and removed
+ */
+export function clearExpiredBlock(now: Date = new Date()): boolean {
+  const expiry = blockExpiry();
+  if (expiry === null || expiry.getTime() > now.getTime()) return false;
+  return removeBlock();
 }
 
 /**

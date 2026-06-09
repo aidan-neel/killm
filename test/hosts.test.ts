@@ -113,6 +113,54 @@ test('hasPrivileges is true under the test override', () => {
   assert.strictEqual(hosts.hasPrivileges(), true);
 });
 
+// ---- expiry tracking and stranded-block healing --------------------------
+
+test('blockExpiry: reads the expiry written by applyBlock', () => {
+  const until = new Date(Date.now() + 60_000);
+  hosts.applyBlock(['claude.ai'], { until });
+  const expiry = hosts.blockExpiry();
+  assert.ok(expiry !== null);
+  assert.strictEqual(expiry.toISOString(), until.toISOString());
+});
+
+test('blockExpiry: null when no block or no marker', () => {
+  assert.strictEqual(hosts.blockExpiry(), null);
+  hosts.applyBlock(['claude.ai']); // no until -> no marker (like killm <= 1.0.2)
+  assert.strictEqual(hosts.blockExpiry(), null);
+});
+
+test('blockExpiry: null for a corrupted timestamp', () => {
+  const block = hosts.buildBlock(['claude.ai']);
+  fs.writeFileSync(
+    tmpHosts,
+    BASE + block.replace(hosts.END, `${hosts.EXPIRES_PREFIX}garbage\n${hosts.END}`) + '\n'
+  );
+  assert.strictEqual(hosts.blockExpiry(), null);
+});
+
+test('clearExpiredBlock: removes a block whose time has passed', () => {
+  hosts.applyBlock(['claude.ai'], { until: new Date(Date.now() - 1000) });
+  assert.strictEqual(hosts.clearExpiredBlock(), true);
+  assert.strictEqual(hosts.isBlocked(), false);
+  assert.ok(fs.readFileSync(tmpHosts, 'utf8').includes('localhost'));
+});
+
+test('clearExpiredBlock: leaves a still-active block alone', () => {
+  hosts.applyBlock(['claude.ai'], { until: new Date(Date.now() + 60_000) });
+  assert.strictEqual(hosts.clearExpiredBlock(), false);
+  assert.strictEqual(hosts.isBlocked(), true);
+});
+
+test('clearExpiredBlock: leaves a marker-less block alone (cannot judge age)', () => {
+  hosts.applyBlock(['claude.ai']);
+  assert.strictEqual(hosts.clearExpiredBlock(), false);
+  assert.strictEqual(hosts.isBlocked(), true);
+});
+
+test('clearExpiredBlock: no-op without a block', () => {
+  assert.strictEqual(hosts.clearExpiredBlock(), false);
+});
+
 // ---- WSL detection -------------------------------------------------------
 
 test('isWsl: detects a Microsoft kernel string (Linux only)', (t) => {

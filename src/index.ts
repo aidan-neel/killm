@@ -104,6 +104,15 @@ async function runBlock(parsed: ParsedArgs): Promise<number> {
     }
   }
 
+  // Heal any expired block stranded by a killed process before applying ours.
+  try {
+    if (hosts.clearExpiredBlock()) {
+      out(c.dim('  (cleaned up an expired block left behind by a previous run)'));
+    }
+  } catch {
+    /* no privileges; the apply below will surface the real error */
+  }
+
   const endTime = Date.now() + durationMs;
   const until = new Date(endTime);
 
@@ -151,6 +160,11 @@ async function runBlock(parsed: ParsedArgs): Promise<number> {
       '\n' +
       c.dim('  file entirely — restart the browser / disable Secure DNS if needed.')
   );
+  out();
+  out(c.yellow('  ⚠ keep this process running — killm lifts the block when the timer'));
+  out(c.yellow('    ends or you press Ctrl+C / close the terminal. If it dies harder'));
+  out(c.yellow('    than that (kill -9, crash, shutdown), the block stays in place'));
+  out(c.yellow('    until you run any killm command again, e.g.  killm --restore'));
   out();
 
   let timer: NodeJS.Timeout | null = null;
@@ -213,6 +227,9 @@ async function runBlock(parsed: ParsedArgs): Promise<number> {
     };
     process.once('SIGINT', () => onSignal('interrupted'));
     process.once('SIGTERM', () => onSignal('terminated'));
+    // Closing the terminal window sends SIGHUP; without this handler Node
+    // dies without cleanup and the block is stranded in the hosts file.
+    process.once('SIGHUP', () => onSignal('terminal closed'));
   });
 
   return 0;
@@ -244,9 +261,36 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
 
     case 'status': {
+      const expiry = hosts.blockExpiry();
+      const expired = expiry !== null && expiry.getTime() <= Date.now();
+
+      if (expired) {
+        // A previous run was killed before it could clean up. Heal it now.
+        try {
+          hosts.clearExpiredBlock();
+          await hosts.flushDns();
+          out(c.green('killm: no block active.'));
+          out(c.dim('(cleaned up an expired block left behind by a previous run)'));
+          return 0;
+        } catch {
+          err(c.yellow('killm: an EXPIRED block is still stuck in the hosts file.'));
+          err('  Clean it up with elevated privileges:  sudo npx killm --restore');
+          return 1;
+        }
+      }
+
       if (hosts.isBlocked()) {
         out(c.yellow('killm: a block is currently ACTIVE.'));
-        out(c.dim('Run "killm --restore" to lift it.'));
+        if (expiry) {
+          out(c.dim(`Scheduled to lift at ${expiry.toLocaleString()}.`));
+          out(
+            c.dim(
+              'If the killm process that created it is no longer running, it will not\n' +
+                'lift itself on time — but any later killm command cleans it up once expired.'
+            )
+          );
+        }
+        out(c.dim('Run "killm --restore" to lift it now.'));
       } else {
         out(c.green('killm: no block active.'));
       }

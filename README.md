@@ -1,6 +1,6 @@
 # killm
 
-**Temporarily block your machine from reaching LLM services, to curb AI dependency.**
+**Temporarily block your machine from reaching LLM services, to curb AI dependency. Shamelessly written with AI.**
 
 ```bash
 npx killm for 1h --agents      # no coding agents for an hour

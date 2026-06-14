@@ -97,7 +97,7 @@ npx killm --status                 # is a block running right now?
 
 ## Firewall mode (`--firewall`)
 
-The hosts file only intercepts name resolution, so a browser with **Secure DNS** 
+The hosts file only intercepts name resolution, so a browser with **Secure DNS**
 enabled bypasses it. `--firewall` closes that hole: in addition to the
 hosts entries, killm resolves each target hostname to its **current IPs** and
 blocks those at the OS firewall:
